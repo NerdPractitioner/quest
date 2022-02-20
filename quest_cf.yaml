@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Launch EC2 instance through launch template
+
+Parameters:
+   UbuntuLatestAMI:
+     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+     Default: /aws/service/canonical/ubuntu/server/18.04/stable/current/amd64/hvm/ebs-gp2/ami-id
+Resources:
+   MyLaunchTemplate: 
+      Type: AWS::EC2::LaunchTemplate
+      Properties: 
+        LaunchTemplateData: 
+          InstanceType: t2.micro
+          KeyName: EC2 Tutorial | RSA
+          SecurityGroupIds: 
+          - sg-598f2678
+          - !GetAtt QuestSG.GroupId
+          IamInstanceProfile:
+            Name: !Ref MyCloudWatchInstanceProfile
+          TagSpecifications: 
+          - ResourceType: instance
+            Tags: 
+            - Key: user
+              Value: mholmes
+          UserData:
+            Fn::Base64: 
+              !Sub |
+                #!/bin/bash
+                sudo yum update -y 
+                sudo yum -y install amazon-cloudwatch-agent
+        LaunchTemplateName: Quest-template
+   MyEc2Ubuntu:
+     Type: AWS::EC2::Instance
+     Properties:
+        ImageId: !Ref UbuntuLatestAMI  
+        LaunchTemplate:
+          LaunchTemplateId: !Ref MyLaunchTemplate
+          Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
+   MyElacticIPmlh:
+      Type: AWS::EC2::EIP
+      Properties: 
+        Domain: vpc
+        InstanceId: !Ref MyEc2Ubuntu
+        Tags: 
+            - Key: user
+              Value: mholmes
+   QuestSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties: 
+        GroupDescription: Allow ICMP trafic
+        SecurityGroupIngress: 
+        - Description: Allow all traffic from ICMP from everywhere
+          CidrIp: 0.0.0.0/0
+          IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+        - Description: Allow SSH trafic from everywhere
+          CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        Tags: 
+        - Key: user
+          Value: mholmes
+   CloudwatchRole:
+      Type: AWS::IAM::Role
+      Properties: 
+        AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+            - Effect: "Allow"
+              Principal: 
+                Service: 
+                - "ec2.amazonaws.com"
+              Action: 
+              - "sts:AssumeRole"
+        Description: Role to access cloudwatch metrics
+        ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy
+        RoleName: cwagent-role
+        Tags: 
+            - Key: user
+              Value: mholmes
+   MyCloudWatchInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties: 
+        InstanceProfileName: cwagent-instance-profile
+        Roles: 
+        - !Ref CloudwatchRole
+
+Outputs:
+  UbuntuElasticIP:
+     Description: Elastic Ip of ubuntu instance
+     Value: !Ref MyElacticIPmlh
+  UbuntuInstanceId:
+     Description: Ubuntu instance Id
+     Value: !Ref MyEc2Ubuntu
