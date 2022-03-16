@@ -168,22 +168,18 @@ resource "aws_security_group" "holmes_sg" {
 
 ## TLS SELF SIGNED
 
-resource "tls_private_key" "example" {
+resource "tls_private_key" "sample_key" {
   algorithm = "ECDSA"
 }
 
-resource "tls_self_signed_cert" "example" {
-  key_algorithm   = "${tls_private_key.example.algorithm}"
-  private_key_pem = "${tls_private_key.example.private_key_pem}"
+resource "tls_self_signed_cert" "rearc_ss_cert" {
+  key_algorithm   = "${tls_private_key.sample_key.algorithm}"
+  private_key_pem = "${tls_private_key.sample_key.private_key_pem}"
 
-  # Certificate expires after 12 hours.
   validity_period_hours = 12
-
-  # Generate a new certificate if Terraform is run within three
-  # hours of the certificate's expiration time.
   early_renewal_hours = 3
 
-  # Reasonable set of uses for a server SSL certificate.
+
   allowed_uses = [
       "key_encipherment",
       "digital_signature",
@@ -198,9 +194,8 @@ resource "tls_self_signed_cert" "example" {
   }
 }
 
-# For example, this can be used to populate an AWS IAM server certificate.
-resource "aws_iam_server_certificate" "example" {
+resource "aws_iam_server_certificate" "rearc_cert" {
   name             = "example_self_signed_cert"
-  certificate_body = "${tls_self_signed_cert.example.cert_pem}"
-  private_key      = "${tls_private_key.example.private_key_pem}"
+  certificate_body = "${tls_self_signed_cert.rearc_ss_cert.cert_pem}"
+  private_key      = "${tls_private_key.rearc_ss_cert.private_key_pem}"
 }
